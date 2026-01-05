@@ -4,8 +4,22 @@ void main() {
   runApp(
     MaterialApp(
       home: Scaffold(
-        backgroundColor: Colors.red,
-        body: Center(child: Text("Hello, World!")),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.red,
+                Colors.orange,
+                Colors.yellow,
+                Colors.green,
+                Colors.blue,
+                Colors.indigo,
+                Colors.purple,
+              ],
+            ),
+          ),
+          child: Center(child: Text("Hello, World!")),
+        ),
       ),
     ),
   );
