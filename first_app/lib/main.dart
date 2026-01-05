@@ -16,6 +16,8 @@ void main() {
                 Colors.indigo,
                 Colors.purple,
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
           child: Center(child: Text("Hello, World!")),
