@@ -34,7 +34,6 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
     _initializeGame();
   }
 
-  // Resets everything to the initial state
   void _initializeGame() {
     soldiers = List.generate(n, (i) => i + 1);
     eliminated = [];
@@ -44,21 +43,16 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
     lastAction = "Press Start to begin!";
   }
 
-  // This function is triggered by the START button
   void _confirmAndStart() {
     int? newN = int.tryParse(_inputController.text);
     if (newN != null && newN > 1 && newN <= 500) {
       setState(() {
         n = newN;
-        _initializeGame(); // Rebuild circle with new N
+        _initializeGame();
         _isStarted = true;
         lastAction = "The battle has begun!";
       });
-      FocusScope.of(context).unfocus(); // Close the keyboard
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter a valid number (2-500)")),
-      );
+      FocusScope.of(context).unfocus();
     }
   }
 
@@ -69,23 +63,33 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
         int killIndex = (currentIndex + 1) % soldiers.length;
         int victim = soldiers[killIndex];
 
-        if (victim < killer) roundCount++;
+        // FIXED ROUND LOGIC:
+        // If the index of the victim is 0, it means the 'sword'
+        // just crossed the starting point of the current list.
+        if (killIndex == 0) {
+          roundCount++;
+        }
 
         lastAction = "Soldier $killer killed $victim";
         eliminated.add(victim);
         soldiers.removeAt(killIndex);
-        currentIndex = killIndex % soldiers.length;
 
-        if (soldiers.length == 1) {
-          lastAction = "SURVIVOR: #${soldiers[0]}!";
-        }
+        // After removal, if the killer was the last person in the list,
+        // the next killer will be at index 0 (the start of the list).
+        currentIndex = killIndex % soldiers.length;
+      });
+    }
+
+    if (soldiers.length == 1) {
+      setState(() {
+        lastAction = "SURVIVOR: #${soldiers[0]}!";
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Nodes get smaller as N gets larger
+    // Dynamic node size
     final double nodeSize = n > 100 ? 12.0 : (n > 50 ? 20.0 : 35.0);
 
     return Scaffold(
@@ -95,9 +99,7 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
       ),
       body: Column(
         children: [
-          // Input & Stats Header
           _buildTopPanel(),
-
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -112,7 +114,6 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
 
                 return Stack(
                   children: [
-                    // The Circular Path
                     Center(
                       child: Container(
                         width: radius * 2,
@@ -123,8 +124,6 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                         ),
                       ),
                     ),
-
-                    // Winner Display
                     if (soldiers.length == 1)
                       Center(
                         child: Column(
@@ -146,8 +145,6 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                           ],
                         ),
                       ),
-
-                    // Soldier Nodes
                     ...List.generate(n, (index) {
                       int num = index + 1;
                       bool isDead = eliminated.contains(num);
@@ -190,35 +187,23 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
     return Container(
       padding: const EdgeInsets.all(16),
       color: Colors.green[50],
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Text(
-                "Input n: ",
-                style: TextStyle(fontWeight: FontWeight.bold),
+          const Text("n: ", style: TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(
+            width: 60,
+            child: TextField(
+              controller: _inputController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.all(8),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _inputController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    hintText: "e.g. 41",
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              _StatTile("Round", _isStarted ? "$roundCount" : "-"),
-              _StatTile("Alive", "${soldiers.length}"),
-            ],
+            ),
           ),
+          const Spacer(),
+          _StatTile("Round", _isStarted ? "$roundCount" : "-"),
+          _StatTile("Alive", "${soldiers.length}"),
         ],
       ),
     );
@@ -226,7 +211,7 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
 
   Widget _StatTile(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: Column(
         children: [
           Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
@@ -242,10 +227,7 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
   Widget _buildControls() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black12)],
-      ),
+      color: Colors.white,
       child: Column(
         children: [
           Text(
@@ -256,30 +238,18 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Combined Confirm/Start/Reset button
               if (!_isStarted || soldiers.length == 1)
-                ElevatedButton.icon(
+                ElevatedButton(
                   onPressed: _confirmAndStart,
-                  icon: Icon(
-                    soldiers.length == 1 ? Icons.refresh : Icons.play_arrow,
-                  ),
-                  label: Text(
-                    soldiers.length == 1
-                        ? "Reset & Restart"
-                        : "Confirm & Start",
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
+                  child: Text(
+                    soldiers.length == 1 ? "Reset" : "Confirm & Start",
                   ),
                 )
               else
                 OutlinedButton(
-                  onPressed: () => setState(() => _initializeGame()),
+                  onPressed: _initializeGame,
                   child: const Text("Reset"),
                 ),
-
-              // Execution Button
               ElevatedButton(
                 onPressed: (_isStarted && soldiers.length > 1)
                     ? _nextStep
@@ -287,10 +257,6 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 12,
-                  ),
                 ),
                 child: const Text("Next Step"),
               ),
@@ -308,7 +274,6 @@ class _SoldierNode extends StatelessWidget {
   final bool isCurrent;
   final double size;
   final bool showText;
-
   const _SoldierNode({
     required this.number,
     required this.isDead,
