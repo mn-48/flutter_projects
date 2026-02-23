@@ -17,21 +17,53 @@ class JosephusSimulation extends StatefulWidget {
 }
 
 class _JosephusSimulationState extends State<JosephusSimulation> {
-  final int n = 64;
+  int n = 12;
+  final TextEditingController _inputController = TextEditingController();
+
   List<int> soldiers = [];
   int currentIndex = 0;
   List<int> eliminated = [];
-  String lastAction = "Start the circle!";
+  String lastAction = "Enter n and press Start!";
   int roundCount = 1;
+  bool _isStarted = false;
 
   @override
   void initState() {
     super.initState();
+    _inputController.text = n.toString();
+    _initializeGame();
+  }
+
+  // Resets everything to the initial state
+  void _initializeGame() {
     soldiers = List.generate(n, (i) => i + 1);
+    eliminated = [];
+    currentIndex = 0;
+    roundCount = 1;
+    _isStarted = false;
+    lastAction = "Press Start to begin!";
+  }
+
+  // This function is triggered by the START button
+  void _confirmAndStart() {
+    int? newN = int.tryParse(_inputController.text);
+    if (newN != null && newN > 1 && newN <= 500) {
+      setState(() {
+        n = newN;
+        _initializeGame(); // Rebuild circle with new N
+        _isStarted = true;
+        lastAction = "The battle has begun!";
+      });
+      FocusScope.of(context).unfocus(); // Close the keyboard
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter a valid number (2-500)")),
+      );
+    }
   }
 
   void _nextStep() {
-    if (soldiers.length > 1) {
+    if (soldiers.length > 1 && _isStarted) {
       setState(() {
         int killer = soldiers[currentIndex];
         int killIndex = (currentIndex + 1) % soldiers.length;
@@ -42,63 +74,30 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
         lastAction = "Soldier $killer killed $victim";
         eliminated.add(victim);
         soldiers.removeAt(killIndex);
-
-        // After removal, currentIndex points to the next killer
         currentIndex = killIndex % soldiers.length;
 
-        // Check if we just found the final survivor
         if (soldiers.length == 1) {
-          lastAction = "WINNER: Soldier #${soldiers[0]}!";
-          _showWinnerDialog(soldiers[0]);
+          lastAction = "SURVIVOR: #${soldiers[0]}!";
         }
       });
     }
   }
 
-  void _showWinnerDialog(int winner) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Final Survivor Found!"),
-        content: Text(
-          "Soldier #$winner has survived the Josephus problem in $roundCount rounds.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _reset();
-            },
-            child: const Text("Restart Game"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _reset() {
-    setState(() {
-      soldiers = List.generate(n, (i) => i + 1);
-      eliminated = [];
-      currentIndex = 0;
-      roundCount = 1;
-      lastAction = "Start the circle!";
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    // For 121 soldiers, we need smaller nodes to prevent "Bad Circle" overlapping
-    final double nodeSize = n > 50 ? 20.0 : 40.0;
+    // Nodes get smaller as N gets larger
+    final double nodeSize = n > 100 ? 12.0 : (n > 50 ? 20.0 : 35.0);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Josephus Survivor"),
         backgroundColor: Colors.green[900],
+        title: const Text("Josephus Simulation"),
       ),
       body: Column(
         children: [
-          _buildHeader(),
+          // Input & Stats Header
+          _buildTopPanel(),
+
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -109,22 +108,23 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                 final radius =
                     (math.min(constraints.maxWidth, constraints.maxHeight) /
                         2) -
-                    30;
+                    40;
 
                 return Stack(
                   children: [
-                    // Visual Circle Path
+                    // The Circular Path
                     Center(
                       child: Container(
                         width: radius * 2,
                         height: radius * 2,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black12, width: 1),
+                          border: Border.all(color: Colors.black12),
                         ),
                       ),
                     ),
-                    // Survivor Highlight in the center
+
+                    // Winner Display
                     if (soldiers.length == 1)
                       Center(
                         child: Column(
@@ -133,13 +133,12 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                             const Icon(
                               Icons.emoji_events,
                               color: Colors.amber,
-                              size: 60,
+                              size: 50,
                             ),
                             Text(
-                              "WINNER\n#${soldiers[0]}",
-                              textAlign: TextAlign.center,
+                              "#${soldiers[0]} WINNER",
                               style: const TextStyle(
-                                fontSize: 28,
+                                fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
                               ),
@@ -147,14 +146,15 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                           ],
                         ),
                       ),
-                    // Positioning soldiers
+
+                    // Soldier Nodes
                     ...List.generate(n, (index) {
                       int num = index + 1;
                       bool isDead = eliminated.contains(num);
                       bool isCurrent =
-                          soldiers.isNotEmpty && soldiers[currentIndex] == num;
-                      bool isFinalWinner =
-                          soldiers.length == 1 && soldiers[0] == num;
+                          _isStarted &&
+                          soldiers.isNotEmpty &&
+                          soldiers[currentIndex] == num;
 
                       final double angle =
                           (index * 2 * math.pi / n) - (math.pi / 2);
@@ -170,8 +170,8 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
                           number: num,
                           isDead: isDead,
                           isCurrent: isCurrent,
-                          isFinalWinner: isFinalWinner,
                           size: nodeSize,
+                          showText: n < 80,
                         ),
                       );
                     }),
@@ -186,67 +186,110 @@ class _JosephusSimulationState extends State<JosephusSimulation> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildTopPanel() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.green[50],
-        border: const Border(bottom: BorderSide(color: Colors.black12)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      padding: const EdgeInsets.all(16),
+      color: Colors.green[50],
+      child: Column(
         children: [
-          _StatText("Round", "$roundCount"),
-          _StatText("Alive", "${soldiers.length}"),
-          if (soldiers.length == 1)
-            const Text(
-              "SURVIVOR FOUND!",
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
+          Row(
+            children: [
+              const Text(
+                "Input n: ",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _inputController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: "e.g. 41",
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              _StatTile("Round", _isStarted ? "$roundCount" : "-"),
+              _StatTile("Alive", "${soldiers.length}"),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _StatText(String label, String value) {
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-      ],
+  Widget _StatTile(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildControls() {
     return Container(
-      padding: const EdgeInsets.all(25),
-      color: Colors.white,
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black12)],
+      ),
       child: Column(
         children: [
           Text(
             lastAction,
-            style: TextStyle(
-              fontSize: 16,
-              color: soldiers.length == 1 ? Colors.green : Colors.redAccent,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              OutlinedButton(onPressed: _reset, child: const Text("Reset")),
+              // Combined Confirm/Start/Reset button
+              if (!_isStarted || soldiers.length == 1)
+                ElevatedButton.icon(
+                  onPressed: _confirmAndStart,
+                  icon: Icon(
+                    soldiers.length == 1 ? Icons.refresh : Icons.play_arrow,
+                  ),
+                  label: Text(
+                    soldiers.length == 1
+                        ? "Reset & Restart"
+                        : "Confirm & Start",
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                )
+              else
+                OutlinedButton(
+                  onPressed: () => setState(() => _initializeGame()),
+                  child: const Text("Reset"),
+                ),
+
+              // Execution Button
               ElevatedButton(
-                onPressed: soldiers.length > 1 ? _nextStep : null,
+                onPressed: (_isStarted && soldiers.length > 1)
+                    ? _nextStep
+                    : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 15,
+                    horizontal: 30,
+                    vertical: 12,
                   ),
                 ),
                 child: const Text("Next Step"),
@@ -263,47 +306,43 @@ class _SoldierNode extends StatelessWidget {
   final int number;
   final bool isDead;
   final bool isCurrent;
-  final bool isFinalWinner;
   final double size;
+  final bool showText;
 
   const _SoldierNode({
     required this.number,
     required this.isDead,
     required this.isCurrent,
-    required this.isFinalWinner,
     required this.size,
+    required this.showText,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isFinalWinner ? size * 1.5 : size,
-      height: isFinalWinner ? size * 1.5 : size,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isDead
             ? Colors.transparent
-            : (isFinalWinner
-                  ? Colors.orange
-                  : (isCurrent ? Colors.blue : Colors.green[800])),
+            : (isCurrent ? Colors.blue : Colors.green[800]),
         border: Border.all(
-          color: isDead
-              ? Colors.grey[200]!
-              : (isFinalWinner
-                    ? Colors.red
-                    : (isCurrent ? Colors.yellow : Colors.white)),
-          width: isCurrent || isFinalWinner ? 3 : 1,
+          color: isCurrent
+              ? Colors.yellow
+              : (isDead ? Colors.grey[200]! : Colors.white),
+          width: isCurrent ? 2 : 1,
         ),
       ),
       alignment: Alignment.center,
-      child: isDead
-          ? const SizedBox()
+      child: isDead || !showText
+          ? null
           : Text(
               "$number",
               style: TextStyle(
                 color: Colors.white,
-                fontSize: size < 25 ? 8 : 10,
+                fontSize: size / 2.5,
                 fontWeight: FontWeight.bold,
               ),
             ),
